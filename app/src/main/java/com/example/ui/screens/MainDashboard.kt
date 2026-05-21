@@ -80,14 +80,14 @@ fun MainDashboard(
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     
-    val context = LocalContext.current
+    val dashboardContext = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) }
     var isAppUnlocked by remember { mutableStateOf(false) }
 
     // Display messages via Toast on synchronization status updates
     LaunchedEffect(syncMessage) {
         syncMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            Toast.makeText(dashboardContext, it, Toast.LENGTH_SHORT).show()
             viewModel.clearSyncMessage()
         }
     }
@@ -136,25 +136,6 @@ fun MainDashboard(
                                         RoundedCornerShape(4.dp)
                                     )
                                     .padding(horizontal = 5.dp, vertical = 2.dp)
-                            )
-                        }
-                    },
-                    actions = {
-                        val isDark = when (preferences.darkModeSetting) {
-                            1 -> false
-                            2 -> true
-                            else -> isSystemInDarkTheme()
-                        }
-                        IconButton(
-                            onClick = {
-                                viewModel.updateDarkModeSetting(if (isDark) 1 else 2)
-                            },
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = "Toggle Theme Mode",
-                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     },
@@ -585,6 +566,7 @@ fun OverviewTab(
     viewModel: BudgetTrackerViewModel,
     pref: AppPreference
 ) {
+    val context = LocalContext.current
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val templates by viewModel.templates.collectAsStateWithLifecycle()
@@ -754,7 +736,14 @@ fun OverviewTab(
             ) {
                 val addTxInteraction = remember { MutableInteractionSource() }
                 Button(
-                    onClick = { showAddTxDialog = true },
+                    onClick = {
+                        if (accounts.isEmpty()) {
+                            Toast.makeText(context, "Please tap 'New Wallet' to register an account first!", Toast.LENGTH_LONG).show()
+                            showAddAccountDialog = true
+                        } else {
+                            showAddTxDialog = true
+                        }
+                    },
                     modifier = Modifier
                         .weight(1.3f)
                         .height(52.dp)
@@ -1318,6 +1307,17 @@ fun AddManualTransactionDialog(
         }
     }
 
+    val context = LocalContext.current
+
+    LaunchedEffect(accounts) {
+        if (selectedAccId.isBlank() && accounts.isNotEmpty()) {
+            selectedAccId = accounts.firstOrNull()?.id ?: ""
+        }
+        if (selectedDestAccId.isBlank() && accounts.size > 1) {
+            selectedDestAccId = accounts.getOrNull(1)?.id ?: ""
+        }
+    }
+
     // Evaluate live arithmetic result helper
     val evaluatedValue = remember(amountInput) {
         evaluateArithmetic(amountInput)
@@ -1576,7 +1576,15 @@ fun AddManualTransactionDialog(
                     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
                     val dateFormatted = sdf.format(Date())
 
-                    if (evaluatedValue > 0 && selectedAccId.isNotBlank()) {
+                    if (accounts.isEmpty()) {
+                        Toast.makeText(context, "Please register a Wallet or Account first!", Toast.LENGTH_LONG).show()
+                    } else if (evaluatedValue <= 0) {
+                        Toast.makeText(context, "Please enter a valid amount greater than zero!", Toast.LENGTH_LONG).show()
+                    } else if (selectedAccId.isBlank()) {
+                        Toast.makeText(context, "Please select an active Wallet or Account!", Toast.LENGTH_LONG).show()
+                    } else if (type == "TRANSFER" && selectedDestAccId.isBlank()) {
+                        Toast.makeText(context, "Please select a destination Wallet or Account for the transfer!", Toast.LENGTH_LONG).show()
+                    } else {
                         // If user wanted bookmark template, write it first
                         if (isBookmarkEnabled && bookmarkTitle.isNotBlank()) {
                             onSaveTemplate(
@@ -2079,6 +2087,56 @@ fun FlowRow(
 
 // --- TAB 3: SYSTEM SETTINGS, DECIMAL & OFFLINE CSV BACKUPS RESTORE ---
 
+data class CurrencyData(val code: String, val symbol: String, val name: String, val country: String)
+
+val currenciesList = listOf(
+    CurrencyData("USD", "$", "US Dollar", "United States, USA, America"),
+    CurrencyData("EUR", "€", "Euro", "Eurozone, Germany, France, Italy, Spain, Europe"),
+    CurrencyData("GBP", "£", "British Pound", "United Kingdom, UK, Great Britain"),
+    CurrencyData("INR", "₹", "Indian Rupee", "India, Bharat"),
+    CurrencyData("JPY", "¥", "Japanese Yen", "Japan"),
+    CurrencyData("CNY", "¥", "Chinese Yuan", "China"),
+    CurrencyData("AUD", "$", "Australian Dollar", "Australia"),
+    CurrencyData("CAD", "$", "Canadian Dollar", "Canada"),
+    CurrencyData("CHF", "Fr", "Swiss Franc", "Switzerland"),
+    CurrencyData("RUB", "₽", "Russian Ruble", "Russia"),
+    CurrencyData("KRW", "₩", "South Korean Won", "South Korea"),
+    CurrencyData("BRL", "R$", "Brazilian Real", "Brazil"),
+    CurrencyData("TRY", "₺", "Turkish Lira", "Turkey"),
+    CurrencyData("ZAR", "R", "South African Rand", "South Africa"),
+    CurrencyData("MXN", "$", "Mexican Peso", "Mexico"),
+    CurrencyData("SGD", "$", "Singapore Dollar", "Singapore"),
+    CurrencyData("NZD", "$", "New Zealand Dollar", "New Zealand"),
+    CurrencyData("HKD", "$", "Hong Kong Dollar", "Hong Kong"),
+    CurrencyData("SEK", "kr", "Swedish Krona", "Sweden"),
+    CurrencyData("NOK", "kr", "Norwegian Krone", "Norway"),
+    CurrencyData("DKK", "kr", "Danish Krone", "Denmark"),
+    CurrencyData("PLN", "zł", "Polish Zloty", "Poland"),
+    CurrencyData("THB", "฿", "Thai Baht", "Thailand"),
+    CurrencyData("IDR", "Rp", "Indonesian Rupiah", "Indonesia"),
+    CurrencyData("HUF", "Ft", "Hungarian Forint", "Hungary"),
+    CurrencyData("ILS", "₪", "Israeli New Shekel", "Israel, Palestine"),
+    CurrencyData("AED", "د.إ", "UAE Dirham", "United Arab Emirates, Dubai"),
+    CurrencyData("SAR", "ر.س", "Saudi Riyal", "Saudi Arabia"),
+    CurrencyData("MYR", "RM", "Malaysian Ringgit", "Malaysia"),
+    CurrencyData("PHP", "₱", "Philippine Peso", "Philippines"),
+    CurrencyData("VND", "₫", "Vietnamese Dong", "Vietnam"),
+    CurrencyData("PKR", "₨", "Pakistani Rupee", "Pakistan"),
+    CurrencyData("EGP", "E£", "Egyptian Pound", "Egypt"),
+    CurrencyData("NPR", "₨", "Nepalese Rupee", "Nepal"),
+    CurrencyData("LKR", "₨", "Sri Lankan Rupee", "Sri Lanka"),
+    CurrencyData("BDT", "৳", "Bangladeshi Taka", "Bangladesh"),
+    CurrencyData("NGN", "₦", "Nigerian Naira", "Nigeria"),
+    CurrencyData("KES", "KSh", "Kenyan Shilling", "Kenya"),
+    CurrencyData("COP", "$", "Colombian Peso", "Colombia"),
+    CurrencyData("CLP", "$", "Chilean Peso", "Chile"),
+    CurrencyData("PEN", "S/.", "Peruvian Sol", "Peru"),
+    CurrencyData("KWD", "د.ك", "Kuwaiti Dinar", "Kuwait"),
+    CurrencyData("BHD", ".د.ب", "Bahraini Dinar", "Bahrain"),
+    CurrencyData("OMR", "ر.ع.", "Omani Rial", "Oman"),
+    CurrencyData("QAR", "ر.ق", "Qatari Riyal", "Qatar")
+)
+
 @Composable
 fun SettingsTab(
     viewModel: BudgetTrackerViewModel,
@@ -2090,17 +2148,19 @@ fun SettingsTab(
     var passcodeState by remember { mutableStateOf(pref.passcode) }
     var currencyState by remember { mutableStateOf(pref.currencySymbol) }
     var startDayState by remember { mutableStateOf(pref.startOfMonthDay.toString()) }
+    var pinEnabledState by remember { mutableStateOf(pref.passcode.isNotEmpty()) }
 
-    var showBackupDialog by remember { mutableStateOf(false) }
-    var generatedBackupText by remember { mutableStateOf("") }
-    var importBackupText by remember { mutableStateOf("") }
-    var showRestoreDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showTermsDialog by remember { mutableStateOf(false) }
+    var showCurrencySelector by remember { mutableStateOf(false) }
+    var currencySearchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(pref) {
         passcodeState = pref.passcode
         currencyState = pref.currencySymbol
         startDayState = pref.startOfMonthDay.toString()
+        pinEnabledState = pref.passcode.isNotEmpty()
     }
 
     LazyColumn(
@@ -2117,6 +2177,7 @@ fun SettingsTab(
             )
         }
 
+        // 1. Visual Theme Selection
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
@@ -2170,6 +2231,7 @@ fun SettingsTab(
             }
         }
 
+        // 2. App Lock Section
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -2180,25 +2242,136 @@ fun SettingsTab(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Currency Symbol
-                    OutlinedTextField(
-                        value = currencyState,
-                        onValueChange = { currencyState = it },
-                        label = { Text("Default Currency Sign (e.g. $, €, ₹, £)") },
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f).padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (pinEnabledState) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = "PIN Lock protection indicator",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Enable App Lock Protection",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "Require 4-digit PIN to access Expensee",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = pinEnabledState,
+                            onCheckedChange = { checked ->
+                                pinEnabledState = checked
+                                if (!checked) {
+                                    passcodeState = ""
+                                    viewModel.updateSecurityPreferences(
+                                        "",
+                                        currencyState,
+                                        startDayState.toIntOrNull() ?: 1,
+                                        pref.subCategoriesEnabled
+                                    )
+                                    Toast.makeText(context, "App lock protection disabled!", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+
+                    if (pinEnabledState) {
+                        OutlinedTextField(
+                            value = passcodeState,
+                            onValueChange = { input ->
+                                val digits = input.filter { it.isDigit() }
+                                passcodeState = digits.take(4)
+                            },
+                            label = { Text("Set 4-Digit Security PIN") },
+                            placeholder = { Text("e.g. 1234") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Button(
+                            onClick = {
+                                if (passcodeState.length == 4) {
+                                    viewModel.updateSecurityPreferences(
+                                        passcodeState,
+                                        currencyState,
+                                        startDayState.toIntOrNull() ?: 1,
+                                        pref.subCategoriesEnabled
+                                    )
+                                    Toast.makeText(context, "Security PIN applied successfully!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "PIN must be exactly 4 digits!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Save and Set PIN Lock", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Ledger Param & Currency Selector Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Ledger Parameters & Money Format",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
 
-                    // Passcode
-                    OutlinedTextField(
-                        value = passcodeState,
-                        onValueChange = { passcodeState = it.take(4) }, // max 4 characters
-                        label = { Text("4-Digit Security PIN (leave empty to disable)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // Currency chooser
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showCurrencySelector = true }
+                    ) {
+                        OutlinedTextField(
+                            value = currencyState,
+                            onValueChange = {},
+                            label = { Text("Default Currency Sign") },
+                            readOnly = true,
+                            enabled = false, // ensures click is intercepted on container
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Show currencies selector list",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
-                    // Start of month
+                    // Cycle boundaries
                     OutlinedTextField(
                         value = startDayState,
                         onValueChange = { startDayState = it },
@@ -2216,71 +2389,121 @@ fun SettingsTab(
                                 day,
                                 pref.subCategoriesEnabled
                             )
+                            Toast.makeText(context, "Ledger system parameters updated!", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Apply System Variables", fontWeight = FontWeight.Bold)
+                        Text("Save Ledger Parameters", fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        // CSV Local Backup Restoration
-        item {
-            Text(
-                text = "Backup & Data Recovery (Offline)",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
-        }
-
+        // 4. Legal Policies & Share App
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "MyMoney operates entirely offline. Back up your full checkbook data locally by exporting a structural raw copyable blueprint.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "About & Legal Policies",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
 
-                    // Export
+                    // Share App
                     Button(
                         onClick = {
-                            viewModel.triggerLocalBackup { generated ->
-                                generatedBackupText = generated
-                                showBackupDialog = true
+                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Share Expensee App")
+                                putExtra(android.content.Intent.EXTRA_TEXT, "Control your budgeting completely offline with Expensee! Private, modern, and secure double-entry accounting ledger app. Check it out at: https://ai.studio/build")
                             }
+                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Expensee App"))
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = null)
+                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Export Backup (Raw Copy)", fontWeight = FontWeight.Bold)
+                        Text("Recommend & Share App", fontWeight = FontWeight.Bold)
                     }
 
-                    // Import
-                    FilledTonalButton(
-                        onClick = { showRestoreDialog = true },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.FileDownload, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Restore Past Backup String", fontWeight = FontWeight.Bold)
+                        FilledTonalButton(
+                            onClick = { showPrivacyDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Privacy Policy", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        FilledTonalButton(
+                            onClick = { showTermsDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Terms of Use", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
         }
 
-        // Dangerous reset section
+        // 5. Uninstallation warning Section
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Uninstall warning icon",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "Warning: App Uninstallation Deletes Data",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Expensee stores 100% of your transactions locally in a secure sandbox on your device for absolute privacy. No cloud databases are maintained. Uninstalling the app, clearing app storage database, or factory resetting your device will permanently erase all ledger histories. We do not have access to recover your data.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // 6. Dangerous reset Section
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -2302,7 +2525,7 @@ fun SettingsTab(
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Wipe All Data & Reload Demo", fontWeight = FontWeight.Bold)
+                        Text("Wipe All Local Ledger Data", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -2313,92 +2536,238 @@ fun SettingsTab(
         }
     }
 
-    if (showBackupDialog) {
+    // --- DIALOGS SECTION ---
+
+    // 1. Privacy Policy Dialog
+    if (showPrivacyDialog) {
         AlertDialog(
-            onDismissRequest = { showBackupDialog = false },
-            title = { Text("Backup Configuration Exported", fontWeight = FontWeight.Bold) },
+            onDismissRequest = { showPrivacyDialog = false },
+            title = { Text("Privacy Policy", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Copy this raw backup variable completely and save it securely in notes or files.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = generatedBackupText,
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                    )
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "Absolute Offline Ledger Privacy",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "At Expensee, privacy is not an option; it is our foundation. All bookkeeping calculations, asset registrations, transaction logs, security passwords, cycle boundaries, and configurations are maintained strictly within an isolated local SQLite/Room database on your mobile device storage sandbox.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    item {
+                        Text(
+                            text = "Zero Cloud Transmissions",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "We collect zero analytics, zero IP logs, zero session tokens, and zero personal credentials. Expensee utilizes no exterior network endpoints, APIs, sync handlers, telemetry modules, or third-party web trackers. Your financial information stands 100% private and decentralized.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    item {
+                        Text(
+                            text = "Data Retention Safeguards",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Because we write zero data to the network, we retain no records or backup streams on any servers. You hold complete ownership and control over your ledger records.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        clipboardManager.setText(AnnotatedString(generatedBackupText))
-                        Toast.makeText(context, "Copied backup blueprint to clipboard!", Toast.LENGTH_SHORT).show()
-                        showBackupDialog = false
-                    }
-                ) {
-                    Text("Copy Entire Code")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBackupDialog = false }) {
-                    Text("Close")
+                Button(onClick = { showPrivacyDialog = false }) {
+                    Text("I Understand")
                 }
             }
         )
     }
 
-    if (showRestoreDialog) {
+    // 2. Terms of Use Dialog
+    if (showTermsDialog) {
         AlertDialog(
-            onDismissRequest = { showRestoreDialog = false },
-            title = { Text("Restore From Backup blueprint", fontWeight = FontWeight.Bold) },
+            onDismissRequest = { showTermsDialog = false },
+            title = { Text("Terms of Use", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Paste the raw structural configuration pattern you exported previously. This replaces all active records.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = importBackupText,
-                        onValueChange = { importBackupText = it },
-                        placeholder = { Text("Paste Raw blueprint text...") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                    )
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "1. License and Scope",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Expensee grants you a personal, non-exclusive, non-transferable license to operate this accounting framework strictly on your local compatible hardware device. The app remains free, secure, and offline.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    item {
+                        Text(
+                            text = "2. User Data and Hardware Safeguards",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "You are strictly responsible for maintaining physical / software device guards (PIN security locks, and preventing data wipes). Under no event shall developers, distributors, or associates of Expensee be liable for any local transaction loss, registry miscalculations, storage corruptions, hardware thefts, or hardware breakdowns.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    item {
+                        Text(
+                            text = "3. Sandbox Operations Disclaimer",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Our software operates strictly as-is. We warrant no continuous absolute error-free operations in any customized hardware firmware. Booking transactions represents simple digital inputs, and you remain responsible for checking final double-entry checkbook alignment.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.restoreLocalBackup(importBackupText) { ok ->
-                            if (ok) {
-                                showRestoreDialog = false
-                                importBackupText = ""
+                Button(onClick = { showTermsDialog = false }) {
+                    Text("Accept Terms")
+                }
+            }
+        )
+    }
+
+    // 3. Searchable Currency Selector Dialog
+    if (showCurrencySelector) {
+        AlertDialog(
+            onDismissRequest = {
+                showCurrencySelector = false
+                currencySearchQuery = ""
+            },
+            title = { Text("Select Default Currency", fontWeight = FontWeight.Bold) },
+            text = {
+                val filteredCurrencies = if (currencySearchQuery.isBlank()) {
+                    currenciesList
+                } else {
+                    currenciesList.filter {
+                        it.code.contains(currencySearchQuery, ignoreCase = true) ||
+                        it.symbol.contains(currencySearchQuery, ignoreCase = true) ||
+                        it.name.contains(currencySearchQuery, ignoreCase = true) ||
+                        it.country.contains(currencySearchQuery, ignoreCase = true)
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = currencySearchQuery,
+                        onValueChange = { currencySearchQuery = it },
+                        placeholder = { Text("Search by symbol, code, country...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (currencySearchQuery.isNotEmpty()) {
+                                IconButton(onClick = { currencySearchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear search query")
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (filteredCurrencies.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No currencies found",
+                                color = MaterialTheme.colorScheme.outline,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(filteredCurrencies) { curr ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            currencyState = curr.symbol
+                                            showCurrencySelector = false
+                                            currencySearchQuery = ""
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = "${curr.name} (${curr.code})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(text = curr.country, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, fontSize = 11.sp)
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = curr.symbol,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
                             }
                         }
                     }
-                ) {
-                    Text("Verify & Overwrite")
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showRestoreDialog = false }) {
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCurrencySelector = false
+                        currencySearchQuery = ""
+                    }
+                ) {
                     Text("Cancel")
                 }
             }
         )
     }
 
+    // 4. Force System Purge Dialog
     if (showResetConfirm) {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
-            title = { Text("Verify Complete System Reset?") },
-            text = { Text("This completely purges your offline ledger histories & variables. It will automatically reload default demo data values.") },
+            title = { Text("Confirm Total Ledger Database Wipe?") },
+            text = { Text("Every single asset, local transaction ledger record, and cycle metric cutoff will be permanently erased. Since Expensee is fully offline with no server mirrors, this action cannot be undone.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -2407,12 +2776,12 @@ fun SettingsTab(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Erase Everything")
+                    Text("Wipe and Purge Everything")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirm = false }) {
-                    Text("Cancel")
+                    Text("Cancel Reset")
                 }
             }
         )

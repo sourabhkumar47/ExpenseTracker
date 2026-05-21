@@ -47,12 +47,20 @@ data class FrequentTemplate(
     val name: String
 )
 
+fun getDefaultCurrencySymbol(): String {
+    return try {
+        java.util.Currency.getInstance(java.util.Locale.getDefault()).symbol
+    } catch (e: Exception) {
+        "$"
+    }
+}
+
 @Entity(tableName = "app_preferences")
 data class AppPreference(
     @PrimaryKey val id: Int = 1,
     val passcode: String = "", // passcode lock (empty = disabled)
-    val currencySymbol: String = "$",
+    val currencySymbol: String = getDefaultCurrencySymbol(),
     val startOfMonthDay: Int = 1, // Custom start of month
     val subCategoriesEnabled: Boolean = false,
-    val darkModeSetting: Int = 0 // 0 = System, 1 = Light, 2 = Dark
+    val darkModeSetting: Int = 2 // 0 = System, 1 = Light, 2 = Dark
 )
