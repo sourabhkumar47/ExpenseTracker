@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.screens.MainDashboard
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.BudgetTrackerViewModel
@@ -19,7 +21,8 @@ class MainActivity : ComponentActivity() {
     }
 
     setContent {
-      MyApplicationTheme {
+      val pref by viewModel.preferences.collectAsStateWithLifecycle()
+      MyApplicationTheme(darkModeSetting = pref.darkModeSetting) {
         MainDashboard(viewModel = viewModel)
       }
     }

@@ -363,16 +363,32 @@ class BudgetTrackerViewModel(
 
     fun updateSecurityPreferences(passcode: String, currencySymbol: String, startOfMonthDay: Int, subCategoriesEnabled: Boolean) {
         viewModelScope.launch {
+            val currentMode = preferences.value.darkModeSetting
             repository.savePreferences(
                 AppPreference(
                     id = 1,
                     passcode = passcode.trim(),
                     currencySymbol = currencySymbol.trim(),
                     startOfMonthDay = startOfMonthDay,
-                    subCategoriesEnabled = subCategoriesEnabled
+                    subCategoriesEnabled = subCategoriesEnabled,
+                    darkModeSetting = currentMode
                 )
             )
             _syncMessage.value = "Accounting variables updated!"
+        }
+    }
+
+    fun updateDarkModeSetting(mode: Int) {
+        viewModelScope.launch {
+            val current = preferences.value
+            repository.savePreferences(
+                current.copy(darkModeSetting = mode)
+            )
+            _syncMessage.value = when (mode) {
+                1 -> "Light theme activated"
+                2 -> "Dark theme activated"
+                else -> "Theme set to follow system"
+            }
         }
     }
 

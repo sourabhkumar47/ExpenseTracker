@@ -7,6 +7,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,6 +25,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.composed
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -112,7 +118,7 @@ fun MainDashboard(
                                     .padding(end = 4.dp)
                             )
                             Text(
-                                text = "MyMoney",
+                                text = "Expensee",
                                 fontWeight = FontWeight.ExtraBold,
                                 fontFamily = FontFamily.SansSerif,
                                 letterSpacing = (-0.5).sp,
@@ -133,16 +139,78 @@ fun MainDashboard(
                             )
                         }
                     },
+                    actions = {
+                        val isDark = when (preferences.darkModeSetting) {
+                            1 -> false
+                            2 -> true
+                            else -> isSystemInDarkTheme()
+                        }
+                        IconButton(
+                            onClick = {
+                                viewModel.updateDarkModeSetting(if (isDark) 1 else 2)
+                            },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = "Toggle Theme Mode",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background
                     )
                 )
+            },
+            bottomBar = {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp
+                ) {
+                    NavigationBarItem(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.AccountBalance,
+                                contentDescription = "Book"
+                            )
+                        },
+                        label = { Text("Book", fontWeight = FontWeight.Bold) },
+                        modifier = Modifier.testTag("nav_overview")
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.PieChart,
+                                contentDescription = "Analytic"
+                            )
+                        },
+                        label = { Text("Analytic", fontWeight = FontWeight.Bold) },
+                        modifier = Modifier.testTag("nav_budgets")
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings"
+                            )
+                        },
+                        label = { Text("Settings", fontWeight = FontWeight.Bold) },
+                        modifier = Modifier.testTag("nav_settings")
+                    )
+                }
             }
         ) { innerPadding ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = innerPadding.calculateTopPadding())
+                    .padding(innerPadding)
             ) {
                 AnimatedContent(
                     targetState = selectedTab,
@@ -155,9 +223,7 @@ fun MainDashboard(
                                 .togetherWith(slideOutHorizontally { width -> width / 3 } + fadeOut())
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 96.dp),
+                    modifier = Modifier.fillMaxSize(),
                     label = "tabChangeTransition"
                 ) { targetState ->
                     when (targetState) {
@@ -166,219 +232,104 @@ fun MainDashboard(
                         2 -> SettingsTab(viewModel, preferences)
                     }
                 }
-
-                // Custom floating bar just like premium iOS 26 glass UI with Material 3 Expressive motions
-                FloatingGlassNavigationBar(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 12.dp)
-                        .navigationBarsPadding()
-                )
             }
         }
     }
 }
 
+// --- CUSTOM DIALOG & OVERRIDE DIALOG BACKPORT FOR EXCELLENT FLUID DESIGN ---
+
 @Composable
-fun FloatingGlassNavigationBar(
-    selectedTab: Int,
-    onTabSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
+fun AlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: (@Composable () -> Unit)? = null,
+    icon: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    iconContentColor: Color = MaterialTheme.colorScheme.primary,
+    titleContentColor: Color = MaterialTheme.colorScheme.onSurface,
+    textContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    tonalElevation: androidx.compose.ui.unit.Dp = 8.dp,
+    properties: androidx.compose.ui.window.DialogProperties = androidx.compose.ui.window.DialogProperties()
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(76.dp)
-            .shadow(
-                elevation = 20.dp,
-                shape = RoundedCornerShape(28.dp),
-                clip = false,
-                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-            ),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.Unspecified
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = properties
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.25f),
-                            Color.White.copy(alpha = 0.05f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(28.dp)
-                )
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = modifier
+                .fillMaxWidth()
+                .widthIn(max = 380.dp)
+                .wrapContentHeight()
+                .shadow(16.dp, shape),
+            shape = shape,
+            color = containerColor,
+            tonalElevation = tonalElevation
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                val items = listOf(
-                    NavigationItemData("Book", Icons.Default.AccountBalance, 0, "nav_overview"),
-                    NavigationItemData("Analytic", Icons.Default.PieChart, 1, "nav_budgets"),
-                    NavigationItemData("Settings", Icons.Default.Settings, 2, "nav_settings")
-                )
-
-                items.forEach { item ->
-                    val isSelected = selectedTab == item.index
-
-                    val interactionSource = remember { MutableInteractionSource() }
-                    val isPressed by interactionSource.collectIsPressedAsState()
-                    val clickScale by animateFloatAsState(
-                        targetValue = if (isPressed) 0.88f else 1.0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessHigh
-                        ),
-                        label = "clickScale"
-                    )
-
-                    val scale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.12f else 1.0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "scale"
-                    )
-
-                    val elevation by animateDpAsState(
-                        targetValue = if (isSelected) 4.dp else 0.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        ),
-                        label = "elevation"
-                    )
-
-                    val activeIndicatorWidth by animateDpAsState(
-                        targetValue = if (isSelected) 84.dp else 0.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "indicatorWidth"
-                    )
-
-                    val iconOffset by animateDpAsState(
-                        targetValue = if (isSelected) (-4).dp else 0.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "iconOffset"
-                    )
-
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.25f else 1.0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        ),
-                        label = "iconScale"
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(item.testTag)
-                            .clickable(
-                                onClick = { onTabSelected(item.index) },
-                                indication = null,
-                                interactionSource = interactionSource
-                            )
-                            .graphicsLayer {
-                                val finalScale = scale * clickScale
-                                scaleX = finalScale
-                                scaleY = finalScale
-                            },
-                        contentAlignment = Alignment.Center
+                if (icon != null || title != null) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .width(activeIndicatorWidth)
-                                .height(46.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
-                                        )
-                                    )
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                    shape = RoundedCornerShape(18.dp)
-                                )
-                                .shadow(elevation, RoundedCornerShape(18.dp))
-                        )
-
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = item.icon,
-                                contentDescription = item.label,
-                                tint = if (isSelected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                },
+                        if (icon != null) {
+                            Box(
                                 modifier = Modifier
-                                    .size(23.dp)
-                                    .graphicsLayer {
-                                        scaleX = iconScale
-                                        scaleY = iconScale
-                                    }
-                                    .offset(y = iconOffset)
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = item.label,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                }
-                            )
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                icon()
+                            }
+                        }
+                        if (title != null) {
+                            CompositionLocalProvider(
+                                LocalContentColor provides titleContentColor,
+                                LocalTextStyle provides MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                            ) {
+                                title()
+                            }
                         }
                     }
+                }
+
+                if (text != null) {
+                    CompositionLocalProvider(
+                        LocalContentColor provides textContentColor,
+                        LocalTextStyle provides MaterialTheme.typography.bodyMedium
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            text()
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (dismissButton != null) {
+                        dismissButton()
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    confirmButton()
                 }
             }
         }
     }
 }
-
-data class NavigationItemData(
-    val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val index: Int,
-    val testTag: String
-)
 
 // --- ARITHMETIC EVALUATOR HELPER ---
 
@@ -391,7 +342,6 @@ fun evaluateArithmetic(input: String): Double {
         var currentToken = ""
         var lastOp = '+'
         
-        // Append a dummy operator at the end to force processing of the final token
         for (char in "$clean+") {
             if (char in listOf('+', '-', '*', '/')) {
                 val value = currentToken.toDoubleOrNull() ?: 0.0
@@ -424,61 +374,130 @@ fun PasscodeLockOverlay(
     var enteredText by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
 
+    val shakeOffset by animateDpAsState(
+        targetValue = if (isError) 10.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioHighBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "shakeOffset"
+    )
+
+    LaunchedEffect(enteredText) {
+        if (enteredText.isNotEmpty()) {
+            isError = false
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.widthIn(max = 320.dp)
+            verticalArrangement = Arrangement.spacedBy(28.dp),
+            modifier = Modifier
+                .widthIn(max = 340.dp)
+                .padding(24.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = "Passcode",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(64.dp)
-            )
-            Text(
-                text = "Enter 4-Digit PIN Lock",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .shadow(12.dp, CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (enteredText.length == 4 && !isError) Icons.Default.LockOpen else Icons.Default.Lock,
+                        contentDescription = "Security Passcode",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "EXPENSEE SECURE GATE",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 11.sp,
+                    letterSpacing = 2.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Enter 4-Digit Security PIN",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
 
             // Animated dot display
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(vertical = 12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .offset(x = shakeOffset)
+                    .padding(vertical = 12.dp)
             ) {
                 for (i in 0 until 4) {
                     val filled = i < enteredText.length
+                    val scale by animateFloatAsState(
+                        targetValue = if (filled) 1.25f else 1.0f,
+                        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+                        label = "dot"
+                    )
+
                     Box(
                         modifier = Modifier
-                            .size(16.dp)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                            .size(18.dp)
                             .clip(CircleShape)
+                            .border(
+                                width = 2.dp,
+                                color = if (isError) MaterialTheme.colorScheme.error 
+                                        else if (filled) MaterialTheme.colorScheme.primary 
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                shape = CircleShape
+                            )
                             .background(
                                 if (isError) MaterialTheme.colorScheme.error
                                 else if (filled) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outlineVariant
+                                else Color.Transparent
                             )
                     )
                 }
             }
 
-            if (isError) {
-                Text(
-                    text = "Incorrect Pin, please try again.",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Box(
+                modifier = Modifier.height(20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isError) {
+                    Text(
+                        text = "Incorrect Lock PIN. Try again.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
             }
 
-            // Numerical responsive keyboard of secure lock gate
+            // Enhanced Numerical Keyboard using clean custom buttons with scaling on press
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val rows = listOf(
@@ -487,48 +506,60 @@ fun PasscodeLockOverlay(
                     listOf("7", "8", "9"),
                     listOf("CLR", "0", "DEL")
                 )
-                
+
                 rows.forEach { row ->
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         row.forEach { char ->
-                            Button(
-                                onClick = {
-                                    isError = false
-                                    when (char) {
-                                        "CLR" -> enteredText = ""
-                                        "DEL" -> if (enteredText.isNotEmpty()) enteredText = enteredText.dropLast(1)
-                                        else -> {
-                                            if (enteredText.length < 4) {
-                                                enteredText += char
-                                            }
-                                        }
-                                    }
-                                    if (enteredText.length == 4) {
-                                        if (enteredText == correctPasscode) {
-                                            onPassed()
-                                        } else {
-                                            isError = true
-                                            enteredText = ""
-                                        }
-                                    }
-                                },
+                            val isSpecial = char == "CLR" || char == "DEL"
+                            Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(60.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                    .height(64.dp)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(
+                                        if (isSpecial) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .bounceClick {
+                                        isError = false
+                                        when (char) {
+                                            "CLR" -> enteredText = ""
+                                            "DEL" -> if (enteredText.isNotEmpty()) enteredText = enteredText.dropLast(1)
+                                            else -> {
+                                                if (enteredText.length < 4) {
+                                                    enteredText += char
+                                                }
+                                            }
+                                        }
+                                        if (enteredText.length == 4) {
+                                            if (enteredText == correctPasscode) {
+                                                onPassed()
+                                            } else {
+                                                isError = true
+                                                enteredText = ""
+                                            }
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = char,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                if (char == "DEL") {
+                                    Icon(
+                                        imageVector = Icons.Default.Backspace,
+                                        contentDescription = "Backspace",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = char,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (isSpecial) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -1156,7 +1187,9 @@ fun CreateAssetDialog(
 
                 Text("Asset Subtype", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     accountTypes.forEach { t ->
@@ -1181,7 +1214,9 @@ fun CreateAssetDialog(
 
                 Text("Choose Theme Tint", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     colors.forEach { hex ->
@@ -1375,7 +1410,9 @@ fun AddManualTransactionDialog(
                         fontWeight = FontWeight.Bold
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         accounts.forEach { acc ->
@@ -1398,7 +1435,9 @@ fun AddManualTransactionDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             accounts.filter { it.id != selectedAccId }.forEach { acc ->
@@ -2080,6 +2119,59 @@ fun SettingsTab(
 
         item {
             Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Visual Appearance Theme",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            Triple("System", 0, Icons.Default.Settings),
+                            Triple("Light", 1, Icons.Default.LightMode),
+                            Triple("Dark", 2, Icons.Default.DarkMode)
+                        ).forEach { (label, value, icon) ->
+                            val isSelected = pref.darkModeSetting == value
+                            Button(
+                                onClick = { viewModel.updateDarkModeSetting(value) },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(vertical = 8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -2327,8 +2419,7 @@ fun SettingsTab(
     }
 }
 
-@Composable
-fun Modifier.scaleOnPress(interactionSource: MutableInteractionSource): Modifier {
+fun Modifier.scaleOnPress(interactionSource: MutableInteractionSource): Modifier = composed {
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.94f else 1.0f,
@@ -2338,19 +2429,18 @@ fun Modifier.scaleOnPress(interactionSource: MutableInteractionSource): Modifier
         ),
         label = "scaleOnPress"
     )
-    return this.graphicsLayer {
+    this.graphicsLayer {
         scaleX = scale
         scaleY = scale
     }
 }
 
-@Composable
 fun Modifier.bounceClick(
     enabled: Boolean = true,
     onClick: () -> Unit
-): Modifier {
+): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
-    return this
+    this
         .scaleOnPress(interactionSource)
         .clickable(
             interactionSource = interactionSource,

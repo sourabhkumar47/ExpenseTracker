@@ -53,5 +53,6 @@ data class AppPreference(
     val passcode: String = "", // passcode lock (empty = disabled)
     val currencySymbol: String = "$",
     val startOfMonthDay: Int = 1, // Custom start of month
-    val subCategoriesEnabled: Boolean = false
+    val subCategoriesEnabled: Boolean = false,
+    val darkModeSetting: Int = 0 // 0 = System, 1 = Light, 2 = Dark
 )
