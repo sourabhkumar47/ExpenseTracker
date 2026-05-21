@@ -1,0 +1,6 @@
+{
+  "name": "MyMoney",
+  "description": "Secure, completely free, and fully offline personal finance management, double-entry bookkeeping, and budget planner inspired by Money Manager and MyMoney.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

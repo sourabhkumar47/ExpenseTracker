@@ -1,0 +1,45 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Sophisticated diagonal shadow casting -->
+    <path
+        android:fillColor="#15000000"
+        android:pathData="M54,26 L82,45 L82,54 L108,80 L108,108 L80,108 Z" />
+
+    <!-- Classic Bank Edifice (Triangle Roof, 4 Ionic Columns, Elevated Base) -->
+    <!-- Triangle pediment / roof -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 26,43 L 82,43 L 54,25 Z" />
+
+    <!-- Architrave support bar -->
+    <path
+        android:fillColor="#EEEEEE"
+        android:pathData="M 28,44 L 80,44 L 80,48 L 28,48 Z" />
+
+    <!-- 4 Majestic vertical Pillars columns -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 32,49 L 38,49 L 38,76 L 32,76 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 44,49 L 50,49 L 50,76 L 44,76 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 58,49 L 64,49 L 64,76 L 58,76 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 70,49 L 76,49 L 76,76 L 70,76 Z" />
+
+    <!-- Solid foundation steps base -->
+    <path
+        android:fillColor="#DDDDDD"
+        android:pathData="M 24,77 L 84,77 L 84,81 L 24,81 Z" />
+    <path
+        android:fillColor="#CCCCCC"
+        android:pathData="M 22,82 L 86,82 L 86,86 L 22,86 Z" />
+
+</vector>
